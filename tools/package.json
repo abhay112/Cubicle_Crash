@@ -1,0 +1,1 @@
+{"name":"car-fight-tools","private":true,"description":"Offline tools to shrink car models (not needed to run the game)","dependencies":{"@gltf-transform/cli":"^4.5.1"}}

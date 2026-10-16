@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Car Fight</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">{ "imports": { "three": "/vendor/three/three.module.js", "three/addons/": "/vendor/three-addons/" } }</script>
+</head>
+<body>
+  <canvas id="three"></canvas>
+
+  <!-- Home: name, photo, create or join -->
+  <section id="home" class="screen active">
+    <div class="glass card">
+      <h1>Car <span class="grad">Fight</span></h1>
+      <p class="sub" id="homeSub">Snap your face, stick it on a car, wreck your friends.</p>
+      <div id="inviteBanner" class="invite hidden">You're invited to room <b id="inviteCode"></b></div>
+
+      <div class="photo-box">
+        <video id="video" class="hidden" autoplay playsinline muted></video>
+        <canvas id="photoPreview" width="160" height="160"></canvas>
+        <div id="photoPlaceholder">📷<br>No photo yet</div>
+      </div>
+      <div class="row">
+        <button id="camBtn">📷 Start camera</button>
+        <button id="snapBtn" class="hidden accent">📸 Take photo</button>
+        <label class="btn">🖼️ Upload<input id="fileInput" type="file" accept="image/*" capture="user" hidden></label>
+      </div>
+      <p id="camMsg" class="hint"></p>
+
+      <div class="garage">
+        <canvas id="carPreview"></canvas>
+        <div id="carInfo" class="car-info"></div>
+      </div>
+      <div id="carChips" class="chips"></div>
+
+      <input id="nameInput" maxlength="16" placeholder="Your name (optional)">
+      <div id="normalJoin">
+        <button id="createBtn" class="primary big">Create room</button>
+        <div class="row">
+          <input id="codeInput" maxlength="4" placeholder="CODE" class="code">
+          <button id="joinBtn" class="primary">Join room</button>
+        </div>
+      </div>
+      <button id="inviteJoinBtn" class="primary big hidden">🏁 Join &amp; start</button>
+      <p id="homeErr" class="err"></p>
+      <button id="newRoomLink" class="link hidden">Create my own room instead</button>
+      <button id="historyBtn" class="link">🏆 Leaderboard &amp; past matches</button>
+      <p id="credits" class="credits"></p>
+    </div>
+  </section>
+
+  <!-- Lobby -->
+  <section id="lobby" class="screen">
+    <div class="glass card wide">
+      <div class="lobby-head">
+        <div>
+          <div class="eyebrow">Room code</div>
+          <div id="roomCode" class="code-big"></div>
+        </div>
+        <div id="playerCount" class="pill"></div>
+      </div>
+      <div class="share">
+        <input id="shareLink" readonly>
+        <button id="copyBtn">📋 Copy invite link</button>
+      </div>
+      <p class="hint left" id="joinHint"></p>
+      <div id="lobbyPlayers" class="players"></div>
+      <div class="eyebrow">Your car</div>
+      <div id="lobbyCars" class="chips"></div>
+      <div class="eyebrow">Map</div>
+      <div id="mapPicker" class="maps"></div>
+      <div id="hostControls" class="hidden">
+        <div class="row settings">
+          <label>Lives <input id="livesInput" type="number" min="1" max="9" value="3"></label>
+          <label>Time (sec) <input id="durationInput" type="number" min="30" max="900" step="30" value="180"></label>
+        </div>
+        <button id="startBtn" class="primary big">Start match</button>
+      </div>
+      <p id="waitMsg" class="hint">Waiting for the host to start…</p>
+      <div class="powers">
+        <span style="--c:#f97316">🚀 Rockets</span><span style="--c:#facc15">🔱 Triple shot</span><span style="--c:#a8a29e">💣 Mines</span>
+        <span style="--c:#3b82f6">🛡️ Shield</span><span style="--c:#e879f9">⚡ Boost</span><span style="--c:#22c55e">❤️ Health</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Game HUD -->
+  <section id="game" class="screen hud">
+    <div id="controls" class="glass panel">
+      <div class="panel-title">Controls <button id="ctrlToggle" class="tiny">–</button></div>
+      <div id="ctrlRows">
+        <div><kbd>W A S D</kbd> / <kbd>← ↑ → ↓</kbd><span>Drive &amp; steer</span></div>
+        <div><kbd>Shift</kbd><span>Boost</span></div>
+        <div><kbd>Space</kbd><span>Fire</span></div>
+        <div><kbd>S</kbd> / <kbd>↓</kbd><span>Brake / reverse</span></div>
+        <div><kbd>H</kbd><span>Horn</span></div>
+        <div><kbd>C</kbd><span>Chase / top camera</span></div>
+        <div><kbd>M</kbd><span>Mute</span></div>
+        <div><kbd>Drag · Scroll</kbd><span>Rotate · Zoom</span></div>
+      </div>
+    </div>
+    <div id="timer" class="glass">3:00</div>
+    <div id="mapName"></div>
+    <div id="levelBadge" class="glass hidden"></div>
+    <div id="levelFade"></div>
+    <div id="feed"></div>
+    <div id="scoreboard" class="glass panel"></div>
+    <canvas id="minimap" width="180" height="180"></canvas>
+    <div id="status" class="glass panel">
+      <div class="hpbar"><div id="hpFill"></div><span id="hpText">100</span></div>
+      <div class="status-row"><span id="lives"></span><span id="weapon"></span></div>
+    </div>
+    <div id="speedo">
+      <div><span id="speed">0</span><small>km/h</small></div>
+      <div class="energy"><div id="energyFill"></div></div>
+    </div>
+    <div id="hostBtns" class="hidden">
+      <button id="restartBtn" class="tiny glass">🔄 Restart</button>
+      <button id="endBtn" class="tiny glass">End match</button>
+    </div>
+    <div id="hitFlash"></div>
+    <div id="center-msg"></div>
+    <div id="touch" class="hidden">
+      <div id="stick"><div id="knob"></div></div>
+      <div id="boostBtn">⚡</div>
+      <div id="fireBtn">FIRE</div>
+    </div>
+  </section>
+
+  <!-- Results -->
+  <section id="results" class="screen">
+    <div class="glass card wide">
+      <h2>🏁 Match over</h2>
+      <p id="resultReason" class="hint"></p>
+      <div id="podium"></div>
+      <div class="table-wrap"><table id="resultTable"></table></div>
+      <div class="row">
+        <button id="againBtn" class="primary big">🔄 Play again</button>
+        <button id="lobbyBtn" class="big hidden">Back to lobby</button>
+      </div>
+      <button class="link" id="historyBtn2">🏆 All-time leaderboard</button>
+    </div>
+  </section>
+
+  <!-- History overlay -->
+  <div id="history" class="overlay hidden">
+    <div class="glass card wide">
+      <button class="close" id="closeHistory">✕</button>
+      <h2>🏆 All-time leaderboard</h2>
+      <div class="table-wrap"><table id="leaderTable"></table></div>
+      <h3>Past matches</h3>
+      <div id="matchList"></div>
+    </div>
+  </div>
+
+  <script type="module" src="client.js"></script>
+</body>
+</html>
