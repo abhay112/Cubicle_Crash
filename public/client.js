@@ -195,12 +195,21 @@ $('fileInput').onchange = e => {
 // ---------- Connection ----------
 $('nameInput').value = store.get('name') || '';
 
+// Hosted on a static host (Vercel) without a game server configured: nothing to connect to
+const NO_SERVER = !SERVER && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1' && /\.vercel\.app$|\.netlify\.app$|\.pages\.dev$/.test(location.hostname);
+const noServerMsg = 'No game server is set up for this site. The owner needs to deploy the server and set GAME_SERVER_URL (see README), then redeploy.';
+if (NO_SERVER) $('homeErr').textContent = noServerMsg;
+
 function connect(first) {
+  if (NO_SERVER) { $('homeErr').textContent = noServerMsg; return; }
   ws = new WebSocket(SERVER ? SERVER.replace(/^http/, 'ws') : (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
   ws.onopen = () => ws.send(JSON.stringify(first));
   ws.onmessage = e => onMessage(JSON.parse(e.data));
   ws.onclose = () => {
     if (myId) { alert('Disconnected from the server.'); location.reload(); }
+    else $('homeErr').textContent = SERVER
+      ? `Could not reach the game server at ${SERVER}. If it is on a free plan it may be waking up; wait a minute and try again.`
+      : 'Could not reach the game server. Is it running?';
   };
 }
 
