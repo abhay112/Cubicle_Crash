@@ -1,0 +1,12 @@
+# Game server (WebSockets + match data) for Render: New > Blueprint, pick this repo.
+# Copy the service URL into GAME_SERVER_URL on Vercel.
+services:
+  - type: web
+    name: cubicle-crash-server
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/info
+    envVars:
+      - key: LAN_HTTPS
+        value: "0"

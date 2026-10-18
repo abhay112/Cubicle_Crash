@@ -4,12 +4,16 @@
   "description": "Local multiplayer car fight game with webcam faces",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "build": "node scripts/build-static.js"
   },
   "dependencies": {
     "express": "^4.21.2",
     "selfsigned": "^2.4.1",
     "three": "^0.169.0",
     "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

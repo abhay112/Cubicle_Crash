@@ -3,6 +3,9 @@ import { World, POWER_COLOR, POWER_ICON } from './world.js';
 import { CarPreview, hasCar, setAvailableModels, ensureModel } from './cars.js';
 
 const $ = id => document.getElementById(id);
+// On Vercel the game server is a separate host (see config.js); locally it is the page's own host
+const SERVER = (window.GAME_SERVER_URL || '').replace(/\/+$/, '');
+const api = p => SERVER + p;
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch {} },
@@ -28,7 +31,7 @@ function previewMap(id) {
 let myCar = store.get('car');
 const carPreview = new CarPreview($('carPreview'));
 window.__carPreview = carPreview; // debugging: freeze with __carPreview.paused = true
-fetch('/api/info').then(r => r.json()).then(info => {
+fetch(api('/api/info')).then(r => r.json()).then(info => {
   maps = info.maps;
   mapArenas = Object.fromEntries(info.maps.filter(m => m.arena).map(m => [m.id, m.arena]));
   cars = info.cars;
@@ -192,7 +195,7 @@ $('fileInput').onchange = e => {
 $('nameInput').value = store.get('name') || '';
 
 function connect(first) {
-  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
+  ws = new WebSocket(SERVER ? SERVER.replace(/^http/, 'ws') : (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
   ws.onopen = () => ws.send(JSON.stringify(first));
   ws.onmessage = e => onMessage(JSON.parse(e.data));
   ws.onclose = () => {
@@ -248,10 +251,10 @@ function onMessage(m) {
       world.buildArena(m.arena);
       history.replaceState(null, '', '?room=' + m.code);
       show('lobby');
-      fetch('/api/info').then(r => r.json()).then(info => {
-        const links = info.ips.map(ip => `https://${ip}:${info.httpsPort}/?room=${m.code}`);
+      fetch(api('/api/info')).then(r => r.json()).then(info => {
+        const links = SERVER ? [`${location.origin}/?room=${m.code}`] : info.ips.map(ip => `https://${ip}:${info.httpsPort}/?room=${m.code}`);
         $('shareLink').value = links[0] || location.href;
-        $('joinHint').textContent = 'Send this link to friends on the same Wi-Fi. They only take a photo and tap Join.';
+        $('joinHint').textContent = SERVER ? 'Send this link to friends. They only take a photo and tap Join.' : 'Send this link to friends on the same Wi-Fi. They only take a photo and tap Join.';
       });
       break;
     case 'roster': onRoster(m); break;
@@ -569,7 +572,7 @@ function showResults(m) {
 // ---------- History ----------
 async function openHistory() {
   $('history').classList.remove('hidden');
-  const [board, matches] = await Promise.all([fetch('/api/leaderboard').then(r => r.json()), fetch('/api/matches').then(r => r.json())]);
+  const [board, matches] = await Promise.all([fetch(api('/api/leaderboard')).then(r => r.json()), fetch(api('/api/matches')).then(r => r.json())]);
   $('leaderTable').innerHTML = board.length ? `
     <tr><th>#</th><th style="text-align:left">Driver</th><th>Wins</th><th>Matches</th><th>Kills</th><th>Deaths</th><th>Damage</th></tr>
     ${board.map((e, i) => `<tr><td>${i + 1}</td><td class="n">${esc(e.name)}</td><td>${e.wins}</td><td>${e.matches}</td><td>${e.kills}</td><td>${e.deaths}</td><td>${e.damageDealt}</td></tr>`).join('')}`

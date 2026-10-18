@@ -712,6 +712,11 @@ function handleConnection(ws, req) {
 
 // ---------- HTTP ----------
 const app = express();
+// The page can be hosted elsewhere (e.g. Vercel); ALLOWED_ORIGIN limits who may call the API (default: anyone)
+app.use('/api', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
+  next();
+});
 // Always revalidate (ETag) so players never run an old cached copy of the game after an update
 app.use(express.static(path.join(__dirname, 'public'), { setHeaders: res => res.setHeader('Cache-Control', 'no-cache') }));
 app.use('/vendor/three', express.static(path.join(__dirname, 'node_modules/three/build')));
@@ -772,7 +777,9 @@ httpServer.listen(HTTP_PORT, '0.0.0.0', () => {
 });
 
 // Self-signed HTTPS so phones/laptops on the LAN can use their camera (browsers require a secure origin).
-try {
+if (process.env.LAN_HTTPS === '0') {
+  // Hosted behind a platform that terminates TLS (Render, Fly, ...): no self-signed HTTPS needed
+} else try {
   const certDir = path.join(DATA_DIR, 'cert');
   const keyFile = path.join(certDir, 'key.pem'), certFile = path.join(certDir, 'cert.pem');
   if (!fs.existsSync(keyFile)) {

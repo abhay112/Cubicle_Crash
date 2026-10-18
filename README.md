@@ -51,3 +51,12 @@ The host picks a map in the lobby (or 🎲 Random), and the 3D scene behind the 
 Each finished match is written to `data/matches/<time>_<room>.json`: players, settings, every kill, pickup, power-up spawn, respawn and elimination, plus final results (place, kills, deaths, damage dealt/taken, accuracy, power-ups). The **Leaderboard** button on the home and results screens shows all-time wins and stats from these files. APIs: `/api/matches`, `/api/matches/:id`, `/api/leaderboard`.
 
 Ports can be changed with `PORT` and `HTTPS_PORT` env vars.
+
+## Deploy: Vercel (page) + a Node host (game server)
+
+Vercel only serves static files and short serverless functions, so it cannot run the WebSocket game server (`server.js`). Deploy in two parts:
+
+1. **Game server** on a host that keeps a Node process running (Render, Railway, Fly.io). `render.yaml` is ready for Render (New > Blueprint). Start command is `npm start`; set `LAN_HTTPS=0` there. Optionally set `ALLOWED_ORIGIN` to your Vercel URL. Note that saved matches/leaderboard live on that host's disk and reset on redeploy unless you add a persistent disk.
+2. **Page** on Vercel: import the repo. `vercel.json` already sets the build (`npm run build` into `dist/`) and rewrites every path to `index.html`, so refreshing on any URL (such as `/?room=ABCD`) works. In Project Settings > Environment Variables add `GAME_SERVER_URL` = your game server's `https://...` URL, then redeploy.
+
+Camera access works on Vercel because it is HTTPS.
