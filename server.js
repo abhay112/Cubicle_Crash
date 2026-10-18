@@ -730,11 +730,12 @@ app.get('/api/stats', (req, res) => {
   perf._bytes = 0; perf._since = Date.now();
 });
 
-app.get('/api/info', (req, res) => {
-  res.json({ ips: lanIPs(), httpPort: HTTP_PORT, httpsPort: HTTPS_PORT, arena: arenaFor('autumn'),
-    cars: availableCars().map(id => ({ id, ...CARS[id] })),
-    maps: [{ id: 'random', name: 'Random', emoji: '🎲' }, ...MAP_IDS.map(id => ({ id, name: MAPS[id].name, emoji: MAPS[id].emoji, w: MAPS[id].w, h: MAPS[id].h, arena: arenaFor(id) }))] });
-});
+const gameInfo = () => ({ ips: lanIPs(), httpPort: HTTP_PORT, httpsPort: HTTPS_PORT, arena: arenaFor('autumn'),
+  cars: availableCars().map(id => ({ id, ...CARS[id] })),
+  maps: [{ id: 'random', name: 'Random', emoji: '🎲' }, ...MAP_IDS.map(id => ({ id, name: MAPS[id].name, emoji: MAPS[id].emoji, w: MAPS[id].w, h: MAPS[id].h, arena: arenaFor(id) }))] });
+app.get('/api/info', (req, res) => res.json(gameInfo()));
+// scripts/build-static.js bakes this into the static site so the menus work even if the game server is asleep
+if (require.main !== module) module.exports = { gameInfo };
 
 function readMatches() {
   return fs.readdirSync(MATCH_DIR).filter(f => f.endsWith('.json')).map(f => {
@@ -769,35 +770,37 @@ app.get('/api/leaderboard', (req, res) => {
   res.json(Object.values(board).sort((a, b) => b.wins - a.wins || b.kills - a.kills || b.damageDealt - a.damageDealt));
 });
 
-const httpServer = http.createServer(app);
-new WebSocketServer({ server: httpServer, perMessageDeflate: false }).on('connection', handleConnection);
-httpServer.listen(HTTP_PORT, '0.0.0.0', () => {
-  console.log(`\n  Car Fight is running!`);
-  console.log(`  This computer:   http://localhost:${HTTP_PORT}`);
-});
-
-// Self-signed HTTPS so phones/laptops on the LAN can use their camera (browsers require a secure origin).
-if (process.env.LAN_HTTPS === '0') {
-  // Hosted behind a platform that terminates TLS (Render, Fly, ...): no self-signed HTTPS needed
-} else try {
-  const certDir = path.join(DATA_DIR, 'cert');
-  const keyFile = path.join(certDir, 'key.pem'), certFile = path.join(certDir, 'cert.pem');
-  if (!fs.existsSync(keyFile)) {
-    const selfsigned = require('selfsigned');
-    const altNames = [{ type: 2, value: 'localhost' }, ...['127.0.0.1', ...lanIPs()].map(ip => ({ type: 7, ip }))];
-    const pems = selfsigned.generate([{ name: 'commonName', value: 'car-fight.local' }], {
-      days: 825, keySize: 2048, algorithm: 'sha256', extensions: [{ name: 'subjectAltName', altNames }],
-    });
-    fs.mkdirSync(certDir, { recursive: true });
-    fs.writeFileSync(keyFile, pems.private);
-    fs.writeFileSync(certFile, pems.cert);
-  }
-  const httpsServer = https.createServer({ key: fs.readFileSync(keyFile), cert: fs.readFileSync(certFile) }, app);
-  new WebSocketServer({ server: httpsServer, perMessageDeflate: false }).on('connection', handleConnection);
-  httpsServer.listen(HTTPS_PORT, '0.0.0.0', () => {
-    for (const ip of lanIPs()) console.log(`  Other devices:   https://${ip}:${HTTPS_PORT}  (accept the certificate warning)`);
-    console.log(`  Match data is saved in ${MATCH_DIR}\n`);
+if (require.main === module) {
+  const httpServer = http.createServer(app);
+  new WebSocketServer({ server: httpServer, perMessageDeflate: false }).on('connection', handleConnection);
+  httpServer.listen(HTTP_PORT, '0.0.0.0', () => {
+    console.log(`\n  Car Fight is running!`);
+    console.log(`  This computer:   http://localhost:${HTTP_PORT}`);
   });
-} catch (err) {
-  console.warn('HTTPS disabled:', err.message);
+
+  // Self-signed HTTPS so phones/laptops on the LAN can use their camera (browsers require a secure origin).
+  if (process.env.LAN_HTTPS === '0') {
+    // Hosted behind a platform that terminates TLS (Render, Fly, ...): no self-signed HTTPS needed
+  } else try {
+    const certDir = path.join(DATA_DIR, 'cert');
+    const keyFile = path.join(certDir, 'key.pem'), certFile = path.join(certDir, 'cert.pem');
+    if (!fs.existsSync(keyFile)) {
+      const selfsigned = require('selfsigned');
+      const altNames = [{ type: 2, value: 'localhost' }, ...['127.0.0.1', ...lanIPs()].map(ip => ({ type: 7, ip }))];
+      const pems = selfsigned.generate([{ name: 'commonName', value: 'car-fight.local' }], {
+        days: 825, keySize: 2048, algorithm: 'sha256', extensions: [{ name: 'subjectAltName', altNames }],
+      });
+      fs.mkdirSync(certDir, { recursive: true });
+      fs.writeFileSync(keyFile, pems.private);
+      fs.writeFileSync(certFile, pems.cert);
+    }
+    const httpsServer = https.createServer({ key: fs.readFileSync(keyFile), cert: fs.readFileSync(certFile) }, app);
+    new WebSocketServer({ server: httpsServer, perMessageDeflate: false }).on('connection', handleConnection);
+    httpsServer.listen(HTTPS_PORT, '0.0.0.0', () => {
+      for (const ip of lanIPs()) console.log(`  Other devices:   https://${ip}:${HTTPS_PORT}  (accept the certificate warning)`);
+      console.log(`  Match data is saved in ${MATCH_DIR}\n`);
+    });
+  } catch (err) {
+    console.warn('HTTPS disabled:', err.message);
+  }
 }

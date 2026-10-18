@@ -31,7 +31,8 @@ function previewMap(id) {
 let myCar = store.get('car');
 const carPreview = new CarPreview($('carPreview'));
 window.__carPreview = carPreview; // debugging: freeze with __carPreview.paused = true
-fetch(api('/api/info')).then(r => r.json()).then(info => {
+// Falls back to the info baked in at build time when the game server can't be reached
+fetch(api('/api/info')).then(r => r.json()).catch(() => fetch('/info.json').then(r => r.json())).then(info => {
   maps = info.maps;
   mapArenas = Object.fromEntries(info.maps.filter(m => m.arena).map(m => [m.id, m.arena]));
   cars = info.cars;
