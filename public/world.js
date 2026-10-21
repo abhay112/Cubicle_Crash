@@ -470,6 +470,17 @@ export class World {
     };
     const photoTex = canvasTexture(256, 256, paintPhoto(null));
     const photoTexPride = canvasTexture(256, 256, paintPhoto(PRIDE_COLORS));
+    if (info.img) {
+      const drawPhoto = () => {
+        for (const tex of [photoTex, photoTexPride]) {
+          const c = tex.image.getContext('2d'), w = 256;
+          c.save(); c.beginPath(); c.arc(w / 2, w / 2, w / 2 - 18, 0, Math.PI * 2); c.clip();
+          c.drawImage(info.img, 18, 18, w - 36, w - 36); c.restore();
+          tex.needsUpdate = true;
+        }
+      };
+      if (info.img.complete && info.img.naturalWidth) drawPhoto(); else info.img.addEventListener('load', drawPhoto, { once: true });
+    }
     // Pride flag draped on the roof (only visible while the Pride power-up is active)
     const flagTex = canvasTexture(64, 96, (c, w, h) => { PRIDE_COLORS.forEach((col, i) => { c.fillStyle = col; c.fillRect(0, i * 96 / 6, 64, 96 / 6 + 1); }); });
     const flag = new THREE.Mesh(new THREE.PlaneGeometry(model.length * 0.6, model.length * 0.4), new THREE.MeshBasicMaterial({ map: flagTex, side: THREE.DoubleSide }));
