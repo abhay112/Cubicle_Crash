@@ -5,8 +5,8 @@ import { buildCar } from './cars.js';
 import { levelY } from './levels.js';
 
 export const S = 1 / 20;
-export const POWER_COLOR = { rocket: '#f97316', triple: '#facc15', mine: '#a8a29e', shield: '#3b82f6', boost: '#e879f9', health: '#22c55e', jump: '#38bdf8', turbo: '#ef4444', foot: '#fb923c' };
-export const POWER_ICON = { rocket: '🚀', triple: '🔱', mine: '💣', shield: '🛡️', boost: '⚡', health: '❤️', jump: '🦘', turbo: '🏎️', foot: '🧍' };
+export const POWER_COLOR = { rocket: '#f97316', triple: '#facc15', mine: '#a8a29e', shield: '#3b82f6', boost: '#e879f9', health: '#22c55e', jump: '#38bdf8', turbo: '#ef4444', foot: '#fb923c', pride: '#ec4899' };
+export const POWER_ICON = { rocket: '🚀', triple: '🔱', mine: '💣', shield: '🛡️', boost: '⚡', health: '❤️', jump: '🦘', turbo: '🏎️', foot: '🧍', pride: '🏳️‍🌈' };
 
 // Look of each map: sky gradient, fog, lights, ground/floor colours, scenery and obstacle style
 const THEMES = {
@@ -187,6 +187,7 @@ export class World {
 
     this.cars = new Map();
     this.powerups = new Map();
+    this._rb = new THREE.Color();
     this.bulletPool = []; this.rocketPool = []; this.minePool = []; this.boomPool = [];
     this.particles = [];
     this.texts = [];
@@ -609,6 +610,7 @@ export class World {
         car.g.rotation.y = -car.a;
         for (const w of car.wheels) w.rotation.z -= (c.sp * S) * dt / 0.48;
         car.shield.visible = !!c.sh;
+        if (c.pd) car.shield.material.color.setHSL((time * 0.8 + 0.5) % 1, 1, 0.6); else car.shield.material.color.set('#60a5fa');
         // On foot: the car body is swapped for a running soldier with a rocket launcher
         const foot = !!c.ft;
         for (const m of car.carParts) m.visible = !foot;
@@ -621,6 +623,17 @@ export class World {
           car.bodyMat.emissive.setRGB(f * 1.2, f * 0.15, f * 0.1);
           car.g.position.x += (Math.random() - 0.5) * 0.25 * f;
           car.g.position.z += (Math.random() - 0.5) * 0.25 * f;
+        } else if (c.pd) {
+          // Pride power-up: the whole car glows in cycling rainbow colours and throws confetti
+          this._rb.setHSL((time * 0.8) % 1, 1, 0.5);
+          car.bodyMat.emissive.setRGB(this._rb.r * 0.7, this._rb.g * 0.7, this._rb.b * 0.7);
+          if ((car.confT = (car.confT || 0) - dt) <= 0) {
+            car.confT = 0.04;
+            this._rb.setHSL(Math.random(), 1, 0.6);
+            this.particles.push({ fy: car.y, p: new THREE.Vector3(car.x + (Math.random() - 0.5) * 2, 1.5 + car.y, car.z + (Math.random() - 0.5) * 2),
+              v: new THREE.Vector3((Math.random() - 0.5) * 4, 3 + Math.random() * 3, (Math.random() - 0.5) * 4),
+              life: 0.9, max: 0.9, c: this._rb.clone(), s: 0.28, rise: true });
+          }
         } else car.bodyMat.emissive.setRGB(0, 0, 0);
         // Damaged cars smoke (black and thick when nearly wrecked)
         if (c.hp < 50 && (car.smokeT -= dt) <= 0) {
@@ -637,6 +650,7 @@ export class World {
         const dir = new THREE.Vector3(Math.cos(car.a), 0, Math.sin(car.a));
         const side = new THREE.Vector3(-dir.z, 0, dir.x);
         const boosting = !!(c.bo || c.nb || c.tb);
+        if (c.pd) car.trails.forEach((t, i) => t.color.setHSL((time * 1.2 + i * 0.5) % 1, 1, 0.55)); else car.trails.forEach(t => t.color.set('#f0abfc'));
         car.trails.forEach((t, i) => {
           const sgn = i ? 1 : -1;
           t.update(new THREE.Vector3(car.x - dir.x * 1.3 + side.x * 0.95 * sgn, 0.12 + car.y, car.z - dir.z * 1.3 + side.z * 0.95 * sgn), side, boosting);
