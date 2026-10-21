@@ -68,6 +68,8 @@ function canvasTexture(w, h, draw) {
   return t;
 }
 
+const PRIDE_COLORS = ['#e40303', '#ff8c00', '#ffed00', '#008026', '#004dff', '#750787']; // rainbow flag
+
 // Ribbon trail drawn behind the rear wheels while boosting
 class Trail {
   constructor(scene, color) {
@@ -449,24 +451,31 @@ export class World {
     g.add(soldier.root);
 
     // Player photo floating above the roof
-    const photoTex = canvasTexture(256, 256, (c, w) => {
-      c.fillStyle = info.color; c.beginPath(); c.arc(w / 2, w / 2, w / 2, 0, Math.PI * 2); c.fill();
+    const initial = (info.name[0] || '?').toUpperCase();
+    // ring === null draws the usual coloured ring; otherwise the six Pride flag stripes
+    const paintPhoto = (ring) => (c, w) => {
+      if (ring) {
+        c.save(); c.beginPath(); c.arc(w / 2, w / 2, w / 2, 0, Math.PI * 2); c.clip();
+        PRIDE_COLORS.forEach((col, i) => { c.fillStyle = col; c.fillRect(0, i * w / 6, w, w / 6 + 1); });
+        c.restore();
+      } else {
+        c.fillStyle = info.color; c.beginPath(); c.arc(w / 2, w / 2, w / 2, 0, Math.PI * 2); c.fill();
+      }
       c.fillStyle = '#fff'; c.beginPath(); c.arc(w / 2, w / 2, w / 2 - 10, 0, Math.PI * 2); c.fill();
       c.save(); c.beginPath(); c.arc(w / 2, w / 2, w / 2 - 18, 0, Math.PI * 2); c.clip();
       c.fillStyle = info.color; c.fillRect(0, 0, w, w);
       c.fillStyle = '#fff'; c.font = 'bold 120px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.fillText((info.name[0] || '?').toUpperCase(), w / 2, w / 2 + 6);
+      c.fillText(initial, w / 2, w / 2 + 6);
       c.restore();
-    });
-    if (info.img) {
-      const drawPhoto = () => {
-        const c = photoTex.image.getContext('2d'), w = 256;
-        c.save(); c.beginPath(); c.arc(w / 2, w / 2, w / 2 - 18, 0, Math.PI * 2); c.clip();
-        c.drawImage(info.img, 18, 18, w - 36, w - 36); c.restore();
-        photoTex.needsUpdate = true;
-      };
-      if (info.img.complete && info.img.naturalWidth) drawPhoto(); else info.img.addEventListener('load', drawPhoto, { once: true });
-    }
+    };
+    const photoTex = canvasTexture(256, 256, paintPhoto(null));
+    const photoTexPride = canvasTexture(256, 256, paintPhoto(PRIDE_COLORS));
+    // Pride flag draped on the roof (only visible while the Pride power-up is active)
+    const flagTex = canvasTexture(64, 96, (c, w, h) => { PRIDE_COLORS.forEach((col, i) => { c.fillStyle = col; c.fillRect(0, i * 96 / 6, 64, 96 / 6 + 1); }); });
+    const flag = new THREE.Mesh(new THREE.PlaneGeometry(model.length * 0.6, model.length * 0.4), new THREE.MeshBasicMaterial({ map: flagTex, side: THREE.DoubleSide }));
+    flag.rotation.x = -Math.PI / 2; flag.rotation.z = Math.PI / 2;
+    flag.position.y = model.height + 0.05; flag.visible = false;
+    g.add(flag);
     const photo = new THREE.Sprite(new THREE.SpriteMaterial({ map: photoTex }));
     photo.scale.set(2, 2, 1);
     photo.position.y = model.height + 1.4;
@@ -489,7 +498,7 @@ export class World {
 
     this.scene.add(g);
     const car = {
-      g, wheels, photo, carParts, soldier, label, labelCanvas, labelTex, shield, lastLabel: '',
+      g, wheels, photo, photoTex, photoTexPride, flag, carParts, soldier, label, labelCanvas, labelTex, shield, lastLabel: '',
       trails: [new Trail(this.scene, '#f0abfc'), new Trail(this.scene, '#f0abfc')],
       x: 0, z: 0, a: 0, wasDead: true, info, bodyMat: body, flash: 0, smokeT: 0,
     };
@@ -610,7 +619,10 @@ export class World {
         car.g.rotation.y = -car.a;
         for (const w of car.wheels) w.rotation.z -= (c.sp * S) * dt / 0.48;
         car.shield.visible = !!c.sh;
-        if (c.pd) car.shield.material.color.setHSL((time * 0.8 + 0.5) % 1, 1, 0.6); else car.shield.material.color.set('#60a5fa');
+        if (c.pd) car.shield.material.color.set(PRIDE_COLORS[Math.floor(time * 3 + 3) % 6]); else car.shield.material.color.set('#60a5fa');
+        car.flag.visible = !!c.pd && !c.ft;
+        const wantTex = c.pd ? car.photoTexPride : car.photoTex;
+        if (car.photo.material.map !== wantTex) { car.photo.material.map = wantTex; car.photo.material.needsUpdate = true; }
         // On foot: the car body is swapped for a running soldier with a rocket launcher
         const foot = !!c.ft;
         for (const m of car.carParts) m.visible = !foot;
@@ -625,11 +637,11 @@ export class World {
           car.g.position.z += (Math.random() - 0.5) * 0.25 * f;
         } else if (c.pd) {
           // Pride power-up: the whole car glows in cycling rainbow colours and throws confetti
-          this._rb.setHSL((time * 0.8) % 1, 1, 0.5);
-          car.bodyMat.emissive.setRGB(this._rb.r * 0.7, this._rb.g * 0.7, this._rb.b * 0.7);
+          this._rb.set(PRIDE_COLORS[Math.floor(time * 3) % 6]);
+          car.bodyMat.emissive.setRGB(this._rb.r * 0.6, this._rb.g * 0.6, this._rb.b * 0.6);
           if ((car.confT = (car.confT || 0) - dt) <= 0) {
             car.confT = 0.04;
-            this._rb.setHSL(Math.random(), 1, 0.6);
+            this._rb.set(PRIDE_COLORS[Math.floor(Math.random() * 6)]);
             this.particles.push({ fy: car.y, p: new THREE.Vector3(car.x + (Math.random() - 0.5) * 2, 1.5 + car.y, car.z + (Math.random() - 0.5) * 2),
               v: new THREE.Vector3((Math.random() - 0.5) * 4, 3 + Math.random() * 3, (Math.random() - 0.5) * 4),
               life: 0.9, max: 0.9, c: this._rb.clone(), s: 0.28, rise: true });
@@ -650,7 +662,7 @@ export class World {
         const dir = new THREE.Vector3(Math.cos(car.a), 0, Math.sin(car.a));
         const side = new THREE.Vector3(-dir.z, 0, dir.x);
         const boosting = !!(c.bo || c.nb || c.tb);
-        if (c.pd) car.trails.forEach((t, i) => t.color.setHSL((time * 1.2 + i * 0.5) % 1, 1, 0.55)); else car.trails.forEach(t => t.color.set('#f0abfc'));
+        if (c.pd) car.trails.forEach((t, i) => t.color.set(PRIDE_COLORS[(Math.floor(time * 6) + i * 3) % 6])); else car.trails.forEach(t => t.color.set('#f0abfc'));
         car.trails.forEach((t, i) => {
           const sgn = i ? 1 : -1;
           t.update(new THREE.Vector3(car.x - dir.x * 1.3 + side.x * 0.95 * sgn, 0.12 + car.y, car.z - dir.z * 1.3 + side.z * 0.95 * sgn), side, boosting);
