@@ -122,7 +122,7 @@ const availableCars = () => {
   catch { return []; }
 };
 const COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ec4899', '#14b8a6', '#f97316', '#84cc16', '#06b6d4', '#e11d48', '#6366f1'];
-const POWERUPS = ['rocket', 'triple', 'mine', 'shield', 'boost', 'health', 'jump', 'turbo', 'foot', 'pride'];
+const POWERUPS = ['rocket', 'triple', 'mine', 'shield', 'boost', 'health', 'jump', 'turbo', 'foot'];
 const WEAPONS = {
   gun: { cooldown: 260, speed: 720, dmg: 7, r: 4 },
   rocket: { cooldown: 650, speed: 540, dmg: 30, r: 7, splash: 80, splashDmg: 18, ammo: 4 },
@@ -236,7 +236,7 @@ function addPlayer(room, ws, name, photo, car) {
   const color = COLORS.find(c => !used.has(c)) || COLORS[room.players.size % COLORS.length];
   const p = {
     id: genId(), ws, name, photo, color, car: pickCar(car), sentPhotos: new Set(),
-    input: { up: 0, down: 0, left: 0, right: 0, fire: 0, boost: 0, horn: 0, jump: 0, jx: 0, jy: 0 }, energy: 100, jumps: 0, jumpUntil: 0, turboUntil: 0, footUntil: 0, prideUntil: 0, hornReady: 0,
+    input: { up: 0, down: 0, left: 0, right: 0, fire: 0, boost: 0, horn: 0, jump: 0, jx: 0, jy: 0 }, energy: 100, jumps: 0, jumpUntil: 0, turboUntil: 0, footUntil: 0, hornReady: 0,
     x: 0, y: 0, angle: 0, speed: 0, vx: 0, vy: 0,
     hp: 100, lives: 0, alive: false, spectator: false, lv: 0, portalCd: 0,
     respawnAt: 0, weapon: 'gun', ammo: 0, fireReady: 0, shieldUntil: 0, boostUntil: 0,
@@ -292,7 +292,7 @@ function spawnCar(room, p) {
   const { w: W, h: H } = room.arena;
   Object.assign(p, {
     x: s.x, y: s.y, lv: 0, portalCd: 0, angle: Math.atan2(H / 2 - s.y, W / 2 - s.x), speed: 0, vx: 0, vy: 0,
-    hp: 100, alive: true, shieldUntil: now() + 2000, boostUntil: 0, jumps: 0, jumpUntil: 0, turboUntil: 0, footUntil: 0, prideUntil: 0, lastHitBy: null, energy: 100,
+    hp: 100, alive: true, shieldUntil: now() + 2000, boostUntil: 0, jumps: 0, jumpUntil: 0, turboUntil: 0, footUntil: 0, lastHitBy: null, energy: 100,
   });
 }
 
@@ -425,7 +425,6 @@ function pickup(room, p, pu) {
   else if (pu.type === 'shield') p.shieldUntil = t + 6000;
   else if (pu.type === 'boost') p.boostUntil = t + 5000;
   else if (pu.type === 'foot') { p.footUntil = t + 12000; p.speed = 0; p.shieldUntil = Math.max(p.shieldUntil, t + 1000); }
-  else if (pu.type === 'pride') { p.prideUntil = t + 8000; p.boostUntil = Math.max(p.boostUntil, t + 8000); p.hp = Math.min(100, p.hp + 20); p.shieldUntil = Math.max(p.shieldUntil, t + 2000); }
   else if (pu.type === 'jump') p.jumps = Math.min(3, p.jumps + 2);
   else if (pu.type === 'turbo') { p.turboUntil = t + 7000; p.boostUntil = Math.max(p.boostUntil, t + 7000); }
   else { p.weapon = pu.type; p.ammo = WEAPONS[pu.type].ammo; }
@@ -608,7 +607,7 @@ function snapshot(room) {
     timeLeft: Math.max(0, Math.round((room.match.endsAt - t) / 1000)),
     cars: [...room.players.values()].filter(p => !p.spectator).map(p => ({
       id: p.id, x: Math.round(p.x), y: Math.round(p.y), lv: p.lv, a: +p.angle.toFixed(3), hp: Math.round(p.hp),
-      lives: p.lives, alive: p.alive, sh: p.shieldUntil > t ? 1 : 0, bo: p.boostUntil > t ? 1 : 0, tb: p.turboUntil > t ? 1 : 0, pd: p.prideUntil > t ? 1 : 0, ft: p.footUntil > t ? Math.ceil((p.footUntil - t) / 1000) : 0, jp: p.jumpUntil > t ? +(1 - (p.jumpUntil - t) / 800).toFixed(2) : -1, jc: p.jumps,
+      lives: p.lives, alive: p.alive, sh: p.shieldUntil > t ? 1 : 0, bo: p.boostUntil > t ? 1 : 0, tb: p.turboUntil > t ? 1 : 0, ft: p.footUntil > t ? Math.ceil((p.footUntil - t) / 1000) : 0, jp: p.jumpUntil > t ? +(1 - (p.jumpUntil - t) / 800).toFixed(2) : -1, jc: p.jumps,
       w: p.weapon, ammo: p.ammo, k: p.stats.kills, sp: Math.round(p.speed), en: Math.round(p.energy),
       nb: p.alive && p.input.boost && p.energy > 0 ? 1 : 0,
       respawn: !p.alive && p.lives > 0 ? Math.max(0, Math.ceil((p.respawnAt - t) / 1000)) : 0,

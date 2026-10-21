@@ -393,7 +393,7 @@ function onState(m) {
     $('hpFill').style.background = me.hp > 50 ? 'linear-gradient(90deg,#22c55e,#84cc16)' : me.hp > 25 ? '#f59e0b' : '#ef4444';
     $('hpText').textContent = `${me.hp} HP`;
     $('lives').textContent = `🚗 × ${me.lives}`;
-    $('weapon').textContent = me.ft ? `🧍🚀 ON FOOT: Rocket launcher (${me.ft}s)` : `${POWER_ICON[me.w] || '🔫'} ${WEAPON_NAME[me.w]}${me.ammo ? ' ×' + me.ammo : ''}${me.sh ? ' 🛡️' : ''}${me.bo ? ' ⚡' : ''}${me.tb ? ' 🏎️' : ''}${me.pd ? ' 🏳️‍🌈' : ''}${me.jc ? ' 🦘×' + me.jc : ''}`;
+    $('weapon').textContent = me.ft ? `🧍🚀 ON FOOT: Rocket launcher (${me.ft}s)` : `${POWER_ICON[me.w] || '🔫'} ${WEAPON_NAME[me.w]}${me.ammo ? ' ×' + me.ammo : ''}${me.sh ? ' 🛡️' : ''}${me.bo ? ' ⚡' : ''}${me.tb ? ' 🏎️' : ''}${me.jc ? ' 🦘×' + me.jc : ''}`;
     $('speed').textContent = Math.round(Math.abs(me.sp) * 0.3);
     $('energyFill').style.width = (me.bo ? 100 : me.en) + '%';
     const cm = $('center-msg');
