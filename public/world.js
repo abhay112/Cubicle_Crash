@@ -5,8 +5,8 @@ import { buildCar } from './cars.js';
 import { levelY } from './levels.js';
 
 export const S = 1 / 20;
-export const POWER_COLOR = { rocket: '#f97316', triple: '#facc15', mine: '#a8a29e', shield: '#3b82f6', boost: '#e879f9', health: '#22c55e', jump: '#38bdf8', turbo: '#ef4444' };
-export const POWER_ICON = { rocket: '🚀', triple: '🔱', mine: '💣', shield: '🛡️', boost: '⚡', health: '❤️', jump: '🦘', turbo: '🏎️' };
+export const POWER_COLOR = { rocket: '#f97316', triple: '#facc15', mine: '#a8a29e', shield: '#3b82f6', boost: '#e879f9', health: '#22c55e', jump: '#38bdf8', turbo: '#ef4444', foot: '#fb923c' };
+export const POWER_ICON = { rocket: '🚀', triple: '🔱', mine: '💣', shield: '🛡️', boost: '⚡', health: '❤️', jump: '🦘', turbo: '🏎️', foot: '🧍' };
 
 // Look of each map: sky gradient, fog, lights, ground/floor colours, scenery and obstacle style
 const THEMES = {
@@ -112,6 +112,41 @@ class Trail {
   }
   reset() { this.pts = []; }
   dispose(scene) { scene.remove(this.mesh); this.geo.dispose(); }
+}
+
+
+// Low-poly soldier carrying a big rocket launcher on the shoulder (faces +x like the cars)
+function buildSoldier(color, h) {
+  const root = new THREE.Group();
+  const k = Math.max(1, h) * 1.25;
+  const mat = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7 });
+  const box = (w, hh, d, c, x, y, z, parent = root) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d), mat(c));
+    m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m;
+  };
+  const legPivot = x => { const p = new THREE.Group(); p.position.set(0, 0.95 * k, x * k); root.add(p); box(0.28 * k, 0.95 * k, 0.28 * k, '#374151', 0, -0.47 * k, 0, p); return p; };
+  const legL = legPivot(-0.2), legR = legPivot(0.2);
+  box(0.5 * k, 0.8 * k, 0.8 * k, color, 0, 1.35 * k, 0);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.3 * k, 12, 10), mat('#f1c27d'));
+  head.position.y = 2.05 * k; head.castShadow = true; root.add(head);
+  box(0.4 * k, 0.16 * k, 0.5 * k, '#1f2937', 0.02 * k, 2.25 * k, 0);
+  const armL = new THREE.Group(); armL.position.set(0.1 * k, 1.65 * k, -0.5 * k); root.add(armL);
+  box(0.9 * k, 0.24 * k, 0.24 * k, color, 0.4 * k, 0, 0, armL);
+  const armR = new THREE.Group(); armR.position.set(0.1 * k, 1.65 * k, 0.5 * k); root.add(armR);
+  box(0.9 * k, 0.24 * k, 0.24 * k, color, 0.4 * k, 0, 0, armR);
+  // Launcher tube on the shoulder, pointing forward, with a glowing warhead tip
+  const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.2 * k, 0.24 * k, 2.6 * k, 12), mat('#4b5563'));
+  tube.rotation.z = Math.PI / 2; tube.position.set(0.8 * k, 1.9 * k, 0.05 * k); tube.castShadow = true; root.add(tube);
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.22 * k, 0.5 * k, 12), new THREE.MeshStandardMaterial({ color: '#f97316', emissive: '#f97316', emissiveIntensity: 0.7 }));
+  tip.rotation.z = -Math.PI / 2; tip.position.set(2.35 * k, 1.9 * k, 0.05 * k); root.add(tip);
+  return {
+    root,
+    animate(time, speed) {
+      const sw = Math.sin(time * 12) * Math.min(1, speed / 120) * 0.9;
+      legL.rotation.z = sw; legR.rotation.z = -sw;
+      root.position.y = Math.abs(Math.sin(time * 12)) * Math.min(1, speed / 120) * 0.12 * k;
+    },
+  };
 }
 
 export class World {
@@ -407,6 +442,10 @@ export class World {
     const model = buildCar(info.car, info.color);
     if (!model) return null; // model still downloading; the car appears as soon as it arrives
     const g = model.group, wheels = model.wheels, body = model.bodyMat;
+    const carParts = [...g.children];
+    const soldier = buildSoldier(info.color, model.height);
+    soldier.root.visible = false;
+    g.add(soldier.root);
 
     // Player photo floating above the roof
     const photoTex = canvasTexture(256, 256, (c, w) => {
@@ -449,7 +488,7 @@ export class World {
 
     this.scene.add(g);
     const car = {
-      g, wheels, photo, label, labelCanvas, labelTex, shield, lastLabel: '',
+      g, wheels, photo, carParts, soldier, label, labelCanvas, labelTex, shield, lastLabel: '',
       trails: [new Trail(this.scene, '#f0abfc'), new Trail(this.scene, '#f0abfc')],
       x: 0, z: 0, a: 0, wasDead: true, info, bodyMat: body, flash: 0, smokeT: 0,
     };
@@ -570,6 +609,11 @@ export class World {
         car.g.rotation.y = -car.a;
         for (const w of car.wheels) w.rotation.z -= (c.sp * S) * dt / 0.48;
         car.shield.visible = !!c.sh;
+        // On foot: the car body is swapped for a running soldier with a rocket launcher
+        const foot = !!c.ft;
+        for (const m of car.carParts) m.visible = !foot;
+        car.soldier.root.visible = foot;
+        if (foot) car.soldier.animate(time, Math.abs(c.sp));
         // Red flash + shake when hit
         if (car.flash > 0) {
           car.flash -= dt;

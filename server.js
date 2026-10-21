@@ -122,12 +122,13 @@ const availableCars = () => {
   catch { return []; }
 };
 const COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ec4899', '#14b8a6', '#f97316', '#84cc16', '#06b6d4', '#e11d48', '#6366f1'];
-const POWERUPS = ['rocket', 'triple', 'mine', 'shield', 'boost', 'health', 'jump', 'turbo'];
+const POWERUPS = ['rocket', 'triple', 'mine', 'shield', 'boost', 'health', 'jump', 'turbo', 'foot'];
 const WEAPONS = {
   gun: { cooldown: 260, speed: 720, dmg: 7, r: 4 },
   rocket: { cooldown: 650, speed: 540, dmg: 30, r: 7, splash: 80, splashDmg: 18, ammo: 4 },
   triple: { cooldown: 300, speed: 720, dmg: 7, r: 4, ammo: 10 },
   mine: { cooldown: 500, dmg: 40, ammo: 3 },
+  launcher: { cooldown: 900, speed: 620, dmg: 55, r: 8, splash: 130, splashDmg: 38 }, // on-foot rocket launcher
 };
 
 // ---------- Helpers ----------
@@ -235,7 +236,7 @@ function addPlayer(room, ws, name, photo, car) {
   const color = COLORS.find(c => !used.has(c)) || COLORS[room.players.size % COLORS.length];
   const p = {
     id: genId(), ws, name, photo, color, car: pickCar(car), sentPhotos: new Set(),
-    input: { up: 0, down: 0, left: 0, right: 0, fire: 0, boost: 0, horn: 0, jump: 0, jx: 0, jy: 0 }, energy: 100, jumps: 0, jumpUntil: 0, turboUntil: 0, hornReady: 0,
+    input: { up: 0, down: 0, left: 0, right: 0, fire: 0, boost: 0, horn: 0, jump: 0, jx: 0, jy: 0 }, energy: 100, jumps: 0, jumpUntil: 0, turboUntil: 0, footUntil: 0, hornReady: 0,
     x: 0, y: 0, angle: 0, speed: 0, vx: 0, vy: 0,
     hp: 100, lives: 0, alive: false, spectator: false, lv: 0, portalCd: 0,
     respawnAt: 0, weapon: 'gun', ammo: 0, fireReady: 0, shieldUntil: 0, boostUntil: 0,
@@ -291,7 +292,7 @@ function spawnCar(room, p) {
   const { w: W, h: H } = room.arena;
   Object.assign(p, {
     x: s.x, y: s.y, lv: 0, portalCd: 0, angle: Math.atan2(H / 2 - s.y, W / 2 - s.x), speed: 0, vx: 0, vy: 0,
-    hp: 100, alive: true, shieldUntil: now() + 2000, boostUntil: 0, jumps: 0, jumpUntil: 0, turboUntil: 0, lastHitBy: null, energy: 100,
+    hp: 100, alive: true, shieldUntil: now() + 2000, boostUntil: 0, jumps: 0, jumpUntil: 0, turboUntil: 0, footUntil: 0, lastHitBy: null, energy: 100,
   });
 }
 
@@ -345,7 +346,7 @@ function damage(room, target, amount, attackerId, cause) {
   if (!target.alive || amount <= 0) return;
   if (target.jumpUntil > now()) return; // airborne: nothing can touch you
   if (target.shieldUntil > now()) { room.fx.push({ k: 'shieldhit', x: target.x, y: target.y, lv: target.lv }); return; }
-  amount *= CARS[target.car].armor;
+  amount *= CARS[target.car].armor * (target.footUntil > now() ? 1.4 : 1); // soldiers are fragile
   amount = Math.min(amount, target.hp);
   target.hp -= amount;
   target.stats.damageTaken += amount;
@@ -380,17 +381,19 @@ function killCar(room, p, killer, cause) {
 function fire(room, p) {
   const t = now();
   if (t < p.fireReady) return;
-  const w = WEAPONS[p.weapon];
+  const onFoot = p.footUntil > t;
+  const w = onFoot ? WEAPONS.launcher : WEAPONS[p.weapon];
   p.fireReady = t + w.cooldown;
-  const nose = CAR_R + 6;
+  const nose = onFoot ? 14 : CAR_R + 6;
   const bx = p.x + Math.cos(p.angle) * nose, by = p.y + Math.sin(p.angle) * nose;
   const shoot = (ang, kind, wd) => {
     room.bullets.push({
       x: bx, y: by, vx: Math.cos(ang) * wd.speed + p.vx * 0.3, vy: Math.sin(ang) * wd.speed + p.vy * 0.3,
-      owner: p.id, kind, dmg: wd.dmg, r: wd.r, life: 1.6, lv: p.lv,
+      owner: p.id, kind, dmg: wd.dmg, r: wd.r, life: 1.6, lv: p.lv, splash: wd.splash, splashDmg: wd.splashDmg,
     });
     p.stats.shots += 1;
   };
+  if (onFoot) { shoot(p.angle, 'rocket', w); return; }
   if (p.weapon === 'gun') shoot(p.angle, 'gun', w);
   else if (p.weapon === 'triple') [-0.22, 0, 0.22].forEach(d => shoot(p.angle + d, 'gun', w));
   else if (p.weapon === 'rocket') shoot(p.angle, 'rocket', w);
@@ -421,6 +424,7 @@ function pickup(room, p, pu) {
   if (pu.type === 'health') p.hp = Math.min(100, p.hp + 40);
   else if (pu.type === 'shield') p.shieldUntil = t + 6000;
   else if (pu.type === 'boost') p.boostUntil = t + 5000;
+  else if (pu.type === 'foot') { p.footUntil = t + 12000; p.speed = 0; p.shieldUntil = Math.max(p.shieldUntil, t + 1000); }
   else if (pu.type === 'jump') p.jumps = Math.min(3, p.jumps + 2);
   else if (pu.type === 'turbo') { p.turboUntil = t + 7000; p.boostUntil = Math.max(p.boostUntil, t + 7000); }
   else { p.weapon = pu.type; p.ammo = WEAPONS[pu.type].ammo; }
@@ -464,10 +468,11 @@ function step(room, dt) {
     p.energy = clamp(p.energy + (nitro ? -40 : 14) * dt, 0, 100);
     const boosted = p.boostUntil > t || nitro;
     const turbo = p.turboUntil > t;
+    const onFoot = p.footUntil > t;
     if (inp.jump && p.jumps > 0 && p.jumpUntil <= t) { p.jumps--; p.jumpUntil = t + 800; room.fx.push({ k: 'jump', x: p.x, y: p.y, lv: p.lv }); }
     if (inp.horn && t >= p.hornReady) { p.hornReady = t + 600; room.fx.push({ k: 'horn', x: p.x, y: p.y, lv: p.lv, id: p.id }); }
     const cs = CARS[p.car];
-    const maxSpeed = (turbo ? 700 : boosted ? 480 : 300) * cs.speed;
+    const maxSpeed = onFoot ? 210 : (turbo ? 700 : boosted ? 480 : 300) * cs.speed;
     let throttle = (inp.up ? 1 : 0) - (inp.down ? 1 : 0);
     let steer = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
     // Touch joystick: steer toward the stick direction, throttle by how far it is pushed
@@ -478,11 +483,11 @@ function step(room, dt) {
       steer = clamp(diff * 3, -1, 1);
       throttle = Math.min(1, jm) * (Math.abs(diff) > 2.4 ? 0.3 : 1);
     }
-    p.speed += throttle * (turbo ? 1500 : boosted ? 900 : 600) * cs.speed * dt;
-    if (!throttle) p.speed *= Math.pow(0.12, dt);
+    p.speed += throttle * (onFoot ? 1600 : turbo ? 1500 : boosted ? 900 : 600) * cs.speed * dt;
+    if (!throttle) p.speed *= Math.pow(onFoot ? 0.0005 : 0.12, dt);
     p.speed = clamp(p.speed, -maxSpeed * 0.5, maxSpeed);
-    const turnFactor = clamp(Math.abs(p.speed) / 120, 0.35, 1) * Math.sign(p.speed || 1);
-    p.angle += steer * 3.2 * cs.turn * turnFactor * dt;
+    const turnFactor = onFoot ? 1 : clamp(Math.abs(p.speed) / 120, 0.35, 1) * Math.sign(p.speed || 1);
+    p.angle += steer * (onFoot ? 4.6 : 3.2 * cs.turn) * turnFactor * dt;
     p.vx = Math.cos(p.angle) * p.speed;
     p.vy = Math.sin(p.angle) * p.speed;
     p.x += p.vx * dt;
@@ -546,6 +551,7 @@ function step(room, dt) {
       const nx = dx / d, ny = dy / d, overlap = CAR_R * 2 - d;
       a.x -= nx * overlap / 2; a.y -= ny * overlap / 2;
       b.x += nx * overlap / 2; b.y += ny * overlap / 2;
+      if (a.footUntil > t || b.footUntil > t) continue; // soldiers just get shoved, no ram damage
       const key = a.id < b.id ? a.id + b.id : b.id + a.id;
       if ((room.ramCd?.[key] || 0) > t) continue;
       const aInto = a.vx * nx + a.vy * ny; // a's speed toward b
@@ -580,7 +586,7 @@ function step(room, dt) {
     if (victim && owner) owner.stats.hits += 1;
     if (b.kind === 'rocket') {
       if (victim) damage(room, victim, b.dmg, b.owner, 'rocket');
-      if (b.life > 0) explode(room, b.x, b.y, b.owner, WEAPONS.rocket.splash, WEAPONS.rocket.splashDmg, b.lv);
+      if (b.life > 0) explode(room, b.x, b.y, b.owner, b.splash || WEAPONS.rocket.splash, b.splashDmg || WEAPONS.rocket.splashDmg, b.lv);
     } else if (victim) {
       damage(room, victim, b.dmg, b.owner, 'gun');
       room.fx.push({ k: 'spark', x: b.x, y: b.y, lv: b.lv });
@@ -601,7 +607,7 @@ function snapshot(room) {
     timeLeft: Math.max(0, Math.round((room.match.endsAt - t) / 1000)),
     cars: [...room.players.values()].filter(p => !p.spectator).map(p => ({
       id: p.id, x: Math.round(p.x), y: Math.round(p.y), lv: p.lv, a: +p.angle.toFixed(3), hp: Math.round(p.hp),
-      lives: p.lives, alive: p.alive, sh: p.shieldUntil > t ? 1 : 0, bo: p.boostUntil > t ? 1 : 0, tb: p.turboUntil > t ? 1 : 0, jp: p.jumpUntil > t ? +(1 - (p.jumpUntil - t) / 800).toFixed(2) : -1, jc: p.jumps,
+      lives: p.lives, alive: p.alive, sh: p.shieldUntil > t ? 1 : 0, bo: p.boostUntil > t ? 1 : 0, tb: p.turboUntil > t ? 1 : 0, ft: p.footUntil > t ? Math.ceil((p.footUntil - t) / 1000) : 0, jp: p.jumpUntil > t ? +(1 - (p.jumpUntil - t) / 800).toFixed(2) : -1, jc: p.jumps,
       w: p.weapon, ammo: p.ammo, k: p.stats.kills, sp: Math.round(p.speed), en: Math.round(p.energy),
       nb: p.alive && p.input.boost && p.energy > 0 ? 1 : 0,
       respawn: !p.alive && p.lives > 0 ? Math.max(0, Math.ceil((p.respawnAt - t) / 1000)) : 0,
