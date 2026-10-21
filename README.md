@@ -19,7 +19,7 @@ npm start
 3. The host picks lives and match time, then clicks **Start match**.
 4. Last car with lives left wins (or the best player when time runs out).
 
-**Controls:** WASD / arrow keys to drive and steer, Shift to boost (recharging bar), Space to fire, H for the horn, C to switch between chase and top camera, M to mute, drag to rotate and scroll to zoom the camera. Phones get a joystick plus fire and boost buttons.
+**Controls:** WASD / arrow keys to drive and steer, Shift to boost (recharging bar), Space to fire, J (or E) to jump after grabbing a 🦘 power-up (dodges everything mid-air), 🏎️ gives a big speed burst, H for the horn, C to switch between chase and top camera, M to mute, drag to rotate and scroll to zoom the camera. Phones get a joystick plus fire and boost buttons.
 
 The arena is rendered in 3D with Three.js (`public/world.js`): a dirt arena with low-poly autumn trees, grass and rocks, a chase camera, boost trails, a minimap and a speedometer.
 
