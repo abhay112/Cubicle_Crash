@@ -5,8 +5,8 @@ import { buildCar } from './cars.js';
 import { levelY } from './levels.js';
 
 export const S = 1 / 20;
-export const POWER_COLOR = { rocket: '#f97316', triple: '#facc15', mine: '#a8a29e', shield: '#3b82f6', boost: '#e879f9', health: '#22c55e' };
-export const POWER_ICON = { rocket: '🚀', triple: '🔱', mine: '💣', shield: '🛡️', boost: '⚡', health: '❤️' };
+export const POWER_COLOR = { rocket: '#f97316', triple: '#facc15', mine: '#a8a29e', shield: '#3b82f6', boost: '#e879f9', health: '#22c55e', jump: '#38bdf8', turbo: '#ef4444' };
+export const POWER_ICON = { rocket: '🚀', triple: '🔱', mine: '💣', shield: '🛡️', boost: '⚡', health: '❤️', jump: '🦘', turbo: '🏎️' };
 
 // Look of each map: sky gradient, fog, lights, ground/floor colours, scenery and obstacle style
 const THEMES = {
@@ -561,7 +561,7 @@ export class World {
         const lv = c.lv || 0;
         car.g.visible = c.alive && lv === this.viewLevel;
         if (!car.g.visible) { car.trails.forEach(t => t.reset()); car.wasDead = true; continue; }
-        car.y = levelY(lv);
+        car.y = levelY(lv) + (c.jp >= 0 ? Math.sin(c.jp * Math.PI) * 3.2 : 0);
         const tp = this.toWorld(c.x, c.y);
         if (car.wasDead) { car.x = tp.x; car.z = tp.z; car.a = c.a; car.wasDead = false; }
         car.x += (tp.x - car.x) * k; car.z += (tp.z - car.z) * k;
@@ -592,7 +592,7 @@ export class World {
         this.drawLabel(car, info.name, c.hp, c.id === myId);
         const dir = new THREE.Vector3(Math.cos(car.a), 0, Math.sin(car.a));
         const side = new THREE.Vector3(-dir.z, 0, dir.x);
-        const boosting = !!(c.bo || c.nb);
+        const boosting = !!(c.bo || c.nb || c.tb);
         car.trails.forEach((t, i) => {
           const sgn = i ? 1 : -1;
           t.update(new THREE.Vector3(car.x - dir.x * 1.3 + side.x * 0.95 * sgn, 0.12 + car.y, car.z - dir.z * 1.3 + side.z * 0.95 * sgn), side, boosting);

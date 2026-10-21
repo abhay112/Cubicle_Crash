@@ -393,7 +393,7 @@ function onState(m) {
     $('hpFill').style.background = me.hp > 50 ? 'linear-gradient(90deg,#22c55e,#84cc16)' : me.hp > 25 ? '#f59e0b' : '#ef4444';
     $('hpText').textContent = `${me.hp} HP`;
     $('lives').textContent = `🚗 × ${me.lives}`;
-    $('weapon').textContent = `${POWER_ICON[me.w] || '🔫'} ${WEAPON_NAME[me.w]}${me.ammo ? ' ×' + me.ammo : ''}${me.sh ? ' 🛡️' : ''}${me.bo ? ' ⚡' : ''}`;
+    $('weapon').textContent = `${POWER_ICON[me.w] || '🔫'} ${WEAPON_NAME[me.w]}${me.ammo ? ' ×' + me.ammo : ''}${me.sh ? ' 🛡️' : ''}${me.bo ? ' ⚡' : ''}${me.tb ? ' 🏎️' : ''}${me.jc ? ' 🦘×' + me.jc : ''}`;
     $('speed').textContent = Math.round(Math.abs(me.sp) * 0.3);
     $('energyFill').style.width = (me.bo ? 100 : me.en) + '%';
     const cm = $('center-msg');
@@ -460,10 +460,10 @@ function frame(t) {
 requestAnimationFrame(frame);
 
 // ---------- Input ----------
-const input = { up: 0, down: 0, left: 0, right: 0, fire: 0, boost: 0, horn: 0, jx: 0, jy: 0 };
+const input = { up: 0, down: 0, left: 0, right: 0, fire: 0, boost: 0, horn: 0, jump: 0, jx: 0, jy: 0 };
 const KEYS = {
   ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
-  Space: 'fire', Enter: 'fire', ShiftLeft: 'boost', ShiftRight: 'boost', KeyH: 'horn',
+  Space: 'fire', Enter: 'fire', ShiftLeft: 'boost', ShiftRight: 'boost', KeyH: 'horn', KeyJ: 'jump', KeyE: 'jump',
 };
 let lastSent = '';
 function sendInput(force) {
@@ -544,7 +544,7 @@ const stickEnd = e => {
 };
 stick.addEventListener('touchend', stickEnd);
 stick.addEventListener('touchcancel', stickEnd);
-for (const [id, key] of [['fireBtn', 'fire'], ['boostBtn', 'boost']]) {
+for (const [id, key] of [['fireBtn', 'fire'], ['boostBtn', 'boost'], ['jumpBtn', 'jump']]) {
   const b = $(id);
   b.addEventListener('touchstart', e => { e.preventDefault(); input[key] = 1; sendInput(); }, { passive: false });
   b.addEventListener('touchend', e => { e.preventDefault(); input[key] = 0; sendInput(); }, { passive: false });

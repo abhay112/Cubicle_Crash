@@ -135,8 +135,9 @@ kbd { font-family: inherit; font-size: .72rem; background: rgba(255, 255, 255, .
 #touch { inset: 0; }
 #stick { position: absolute; left: 28px; bottom: 28px; width: 140px; height: 140px; border-radius: 50%; background: rgba(255, 255, 255, .1); border: 2px solid rgba(255, 255, 255, .3); pointer-events: auto; touch-action: none; backdrop-filter: blur(6px); }
 #knob { position: absolute; left: 45px; top: 45px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255, 255, 255, .55); }
-#fireBtn, #boostBtn { position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; }
+#fireBtn, #boostBtn, #jumpBtn { position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; }
 #fireBtn { right: 30px; bottom: 40px; width: 96px; height: 96px; background: rgba(239, 68, 68, .7); }
+#jumpBtn { right: 30px; bottom: 150px; width: 66px; height: 66px; background: rgba(56, 189, 248, .6); font-size: 1.5rem; }
 #boostBtn { right: 140px; bottom: 30px; width: 66px; height: 66px; background: rgba(232, 121, 249, .6); font-size: 1.5rem; }
 body.touch #controls, body.touch #speedo { display: none; }
 body.touch #status { top: 52px; bottom: auto; width: 200px; padding: 6px 10px; }

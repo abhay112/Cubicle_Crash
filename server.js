@@ -122,7 +122,7 @@ const availableCars = () => {
   catch { return []; }
 };
 const COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ec4899', '#14b8a6', '#f97316', '#84cc16', '#06b6d4', '#e11d48', '#6366f1'];
-const POWERUPS = ['rocket', 'triple', 'mine', 'shield', 'boost', 'health'];
+const POWERUPS = ['rocket', 'triple', 'mine', 'shield', 'boost', 'health', 'jump', 'turbo'];
 const WEAPONS = {
   gun: { cooldown: 260, speed: 720, dmg: 7, r: 4 },
   rocket: { cooldown: 650, speed: 540, dmg: 30, r: 7, splash: 80, splashDmg: 18, ammo: 4 },
@@ -235,7 +235,7 @@ function addPlayer(room, ws, name, photo, car) {
   const color = COLORS.find(c => !used.has(c)) || COLORS[room.players.size % COLORS.length];
   const p = {
     id: genId(), ws, name, photo, color, car: pickCar(car), sentPhotos: new Set(),
-    input: { up: 0, down: 0, left: 0, right: 0, fire: 0, boost: 0, horn: 0, jx: 0, jy: 0 }, energy: 100, hornReady: 0,
+    input: { up: 0, down: 0, left: 0, right: 0, fire: 0, boost: 0, horn: 0, jump: 0, jx: 0, jy: 0 }, energy: 100, jumps: 0, jumpUntil: 0, turboUntil: 0, hornReady: 0,
     x: 0, y: 0, angle: 0, speed: 0, vx: 0, vy: 0,
     hp: 100, lives: 0, alive: false, spectator: false, lv: 0, portalCd: 0,
     respawnAt: 0, weapon: 'gun', ammo: 0, fireReady: 0, shieldUntil: 0, boostUntil: 0,
@@ -291,7 +291,7 @@ function spawnCar(room, p) {
   const { w: W, h: H } = room.arena;
   Object.assign(p, {
     x: s.x, y: s.y, lv: 0, portalCd: 0, angle: Math.atan2(H / 2 - s.y, W / 2 - s.x), speed: 0, vx: 0, vy: 0,
-    hp: 100, alive: true, shieldUntil: now() + 2000, boostUntil: 0, lastHitBy: null, energy: 100,
+    hp: 100, alive: true, shieldUntil: now() + 2000, boostUntil: 0, jumps: 0, jumpUntil: 0, turboUntil: 0, lastHitBy: null, energy: 100,
   });
 }
 
@@ -343,6 +343,7 @@ function backToLobby(room) {
 // ---------- Combat ----------
 function damage(room, target, amount, attackerId, cause) {
   if (!target.alive || amount <= 0) return;
+  if (target.jumpUntil > now()) return; // airborne: nothing can touch you
   if (target.shieldUntil > now()) { room.fx.push({ k: 'shieldhit', x: target.x, y: target.y, lv: target.lv }); return; }
   amount *= CARS[target.car].armor;
   amount = Math.min(amount, target.hp);
@@ -420,6 +421,8 @@ function pickup(room, p, pu) {
   if (pu.type === 'health') p.hp = Math.min(100, p.hp + 40);
   else if (pu.type === 'shield') p.shieldUntil = t + 6000;
   else if (pu.type === 'boost') p.boostUntil = t + 5000;
+  else if (pu.type === 'jump') p.jumps = Math.min(3, p.jumps + 2);
+  else if (pu.type === 'turbo') { p.turboUntil = t + 7000; p.boostUntil = Math.max(p.boostUntil, t + 7000); }
   else { p.weapon = pu.type; p.ammo = WEAPONS[pu.type].ammo; }
   room.fx.push({ k: 'pickup', x: pu.x, y: pu.y, lv: pu.lv, type: pu.type });
   logEvent(room, { type: 'pickup', player: p.id, name: p.name, powerup: pu.type });
@@ -460,9 +463,11 @@ function step(room, dt) {
     const nitro = inp.boost && p.energy > 0 && p.boostUntil <= t;
     p.energy = clamp(p.energy + (nitro ? -40 : 14) * dt, 0, 100);
     const boosted = p.boostUntil > t || nitro;
+    const turbo = p.turboUntil > t;
+    if (inp.jump && p.jumps > 0 && p.jumpUntil <= t) { p.jumps--; p.jumpUntil = t + 800; room.fx.push({ k: 'jump', x: p.x, y: p.y, lv: p.lv }); }
     if (inp.horn && t >= p.hornReady) { p.hornReady = t + 600; room.fx.push({ k: 'horn', x: p.x, y: p.y, lv: p.lv, id: p.id }); }
     const cs = CARS[p.car];
-    const maxSpeed = (boosted ? 480 : 300) * cs.speed;
+    const maxSpeed = (turbo ? 700 : boosted ? 480 : 300) * cs.speed;
     let throttle = (inp.up ? 1 : 0) - (inp.down ? 1 : 0);
     let steer = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
     // Touch joystick: steer toward the stick direction, throttle by how far it is pushed
@@ -473,7 +478,7 @@ function step(room, dt) {
       steer = clamp(diff * 3, -1, 1);
       throttle = Math.min(1, jm) * (Math.abs(diff) > 2.4 ? 0.3 : 1);
     }
-    p.speed += throttle * (boosted ? 900 : 600) * cs.speed * dt;
+    p.speed += throttle * (turbo ? 1500 : boosted ? 900 : 600) * cs.speed * dt;
     if (!throttle) p.speed *= Math.pow(0.12, dt);
     p.speed = clamp(p.speed, -maxSpeed * 0.5, maxSpeed);
     const turnFactor = clamp(Math.abs(p.speed) / 120, 0.35, 1) * Math.sign(p.speed || 1);
@@ -519,7 +524,7 @@ function step(room, dt) {
     // Mines
     for (let i = room.mines.length - 1; i >= 0; i--) {
       const m = room.mines[i];
-      if (t < m.armAt || m.lv !== p.lv) continue;
+      if (t < m.armAt || m.lv !== p.lv || p.jumpUntil > t) continue;
       if (Math.hypot(m.x - p.x, m.y - p.y) < CAR_R + 12) {
         room.mines.splice(i, 1);
         room.fx.push({ k: 'boom', x: m.x, y: m.y, lv: m.lv });
@@ -596,7 +601,7 @@ function snapshot(room) {
     timeLeft: Math.max(0, Math.round((room.match.endsAt - t) / 1000)),
     cars: [...room.players.values()].filter(p => !p.spectator).map(p => ({
       id: p.id, x: Math.round(p.x), y: Math.round(p.y), lv: p.lv, a: +p.angle.toFixed(3), hp: Math.round(p.hp),
-      lives: p.lives, alive: p.alive, sh: p.shieldUntil > t ? 1 : 0, bo: p.boostUntil > t ? 1 : 0,
+      lives: p.lives, alive: p.alive, sh: p.shieldUntil > t ? 1 : 0, bo: p.boostUntil > t ? 1 : 0, tb: p.turboUntil > t ? 1 : 0, jp: p.jumpUntil > t ? +(1 - (p.jumpUntil - t) / 800).toFixed(2) : -1, jc: p.jumps,
       w: p.weapon, ammo: p.ammo, k: p.stats.kills, sp: Math.round(p.speed), en: Math.round(p.energy),
       nb: p.alive && p.input.boost && p.energy > 0 ? 1 : 0,
       respawn: !p.alive && p.lives > 0 ? Math.max(0, Math.ceil((p.respawnAt - t) / 1000)) : 0,
@@ -669,7 +674,7 @@ function handleConnection(ws, req) {
       const i = msg.i || {};
       player.input = {
         up: i.up ? 1 : 0, down: i.down ? 1 : 0, left: i.left ? 1 : 0, right: i.right ? 1 : 0, fire: i.fire ? 1 : 0,
-        boost: i.boost ? 1 : 0, horn: i.horn ? 1 : 0,
+        boost: i.boost ? 1 : 0, horn: i.horn ? 1 : 0, jump: i.jump ? 1 : 0,
         jx: clamp(Number(i.jx) || 0, -1, 1), jy: clamp(Number(i.jy) || 0, -1, 1),
       };
     } else if (msg.t === 'car' && room.state !== 'playing' && availableCars().includes(msg.car)) {
